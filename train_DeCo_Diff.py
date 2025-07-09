@@ -46,17 +46,16 @@ def smooth_mask(mask, sigma=1.0):
 #                             Training Helper Functions                         #
 #################################################################################
 
-@torch.no_grad()
-def update_ema(ema_model, model, decay=0.9999):
-    """
-    Step the EMA model towards the current model.
-    """
-    ema_params = OrderedDict(ema_model.named_parameters())
-    model_params = OrderedDict(model.named_parameters())
+# @torch.no_grad()
+# def update_ema(ema_model, model, decay=0.9999):
+#     """
+#     Step the EMA model towards the current model.
+#     """
+#     ema_params = OrderedDict(ema_model.named_parameters())
+#     model_params = OrderedDict(model.named_parameters())
 
-    for name, param in model_params.items():
-        # TODO: Consider applying only to params that require_grad to avoid small numerical changes of pos_embed
-        ema_params[name].mul_(decay).add_(param.data, alpha=1 - decay)
+#     for name, param in model_params.items():
+#         ema_params[name].mul_(decay).add_(param.data, alpha=1 - decay)
 
 
 def requires_grad(model, flag=True):
@@ -248,12 +247,11 @@ def main(args):
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], inplace=True)
     ])
         
-
     # Prepare models for training:
-    update_ema(ema, model.module, decay=0)  # Ensure EMA is initialized with synced weights
+    # update_ema(ema, model.module, decay=0)  # Ensure EMA is initialized with synced weights
 
     model.train()  # important! This enables embedding dropout for classifier-free guidance
-    ema.eval()  # EMA model should always be in eval mode
+    # ema.eval()  # EMA model should always be in eval mode
 
     # Variables for monitoring/logging purposes:
     train_steps = 0
@@ -309,7 +307,7 @@ def main(args):
                 opt.step()
                 opt.zero_grad() 
                 
-            update_ema(ema, model.module)
+            # update_ema(ema, model.module)
 
             # Log loss values:
             running_loss += loss.item()
