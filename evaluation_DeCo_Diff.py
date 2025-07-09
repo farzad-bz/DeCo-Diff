@@ -1,8 +1,6 @@
 
-import os
+
 import torch
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from skimage.transform import resize
 from diffusion import create_diffusion
 from diffusers.models import AutoencoderKL
