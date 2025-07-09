@@ -113,8 +113,8 @@ class VISADataset(Dataset):
             seg = augmented['mask']
             
         if random.random()< 0.5 and self.mode=='train':
-            img = np.rot90(img, 2)
-            seg = np.rot90(seg, 2)
+            img = np.rot90(img, 2).copy()
+            seg = np.rot90(seg, 2).copy()
             
         img = img.astype(np.float32) / 255.0
         y = self.object_classes[index]
