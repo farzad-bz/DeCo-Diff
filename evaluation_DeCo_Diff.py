@@ -1,5 +1,8 @@
 
+import os
 import torch
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from skimage.transform import resize
 from diffusion import create_diffusion
 from diffusers.models import AutoencoderKL
@@ -16,6 +19,7 @@ from glob import glob
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from MVTECDataLoader import MVTECDataset
+from VISADataLoader import VISADataset
 from scipy.ndimage import gaussian_filter
 
 from anomalib import metrics
@@ -159,7 +163,7 @@ def calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, 
     latent_differences = np.stack(latent_differences, axis=0)
     image_differences = np.stack(image_differences, axis=0)
 
-    return {'anomaly_geometric':pred_aritmetic, 'anomaly_geometric':pred_aritmetic, 'latent_discrepancy':latent_differences, 'image_discrepancy':image_differences}
+    return {'anomaly_geometric':pred_geometric, 'anomaly_aritmetic':pred_aritmetic, 'latent_discrepancy':latent_differences, 'image_discrepancy':image_differences}
 
 
 
@@ -188,7 +192,7 @@ def evaluation(args):
     
 
     latent_size = int(args.center_size) // 8
-    model = UNET_models[args.model_size](latent_size=latent_size)
+    model = UNET_models[args.model_size](latent_size=latent_size, ncls=args.num_classes)
     
     state_dict = torch.load(ckpt)['model']
     print(model.load_state_dict(state_dict))
@@ -219,8 +223,10 @@ def evaluation(args):
         x0_s = []
         segmentation_s = []
         
-    
-        test_dataset = MVTECDataset('test', object_class=category, rootdir=args.data_dir, transform=transform, normal=False, anomaly_class=args.anomaly_class, image_size=args.image_size, center_size=args.actual_image_size, center_crop=True)
+        if args.dataset=='mvtec':
+            test_dataset = MVTECDataset('test', object_class=category, rootdir=args.data_dir, transform=transform, normal=False, anomaly_class=args.anomaly_class, image_size=args.image_size, center_size=args.actual_image_size, center_crop=args.center_crop)
+        else:
+            test_dataset = VISADataset('test', object_class=category, rootdir=args.data_dir, transform=transform, normal=False, anomaly_class=args.anomaly_class, image_size=args.image_size, center_size=args.actual_image_size, center_crop=args.center_crop)
         test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=4, drop_last=False)
         
         for ii, (x, seg, object_cls) in enumerate(test_loader):
@@ -247,7 +253,7 @@ def evaluation(args):
             latent_samples_s += [_latent_samples.unsqueeze(0) for _latent_samples in latent_samples]
             x0_s += [_x0.unsqueeze(0) for _x0 in x0]
 
-        print(category)
+        print(category)        
         anomaly_maps = calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=args.center_size)
         evaluate_anomaly_maps(anomaly_maps, np.stack(segmentation_s, axis=0))
         print('=='*30)  

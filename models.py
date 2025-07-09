@@ -19,24 +19,24 @@ def create_unet_model(latent_size=32, model_channels=256, num_res_blocks=2, num_
     return model
 
 
-def UNET_XS(**kwargs):
-    return  create_unet_model(latent_size=32, model_channels=64, num_heads=4, channel_mult=[1,2,4], context_dim=128)
+def UNET_XS(latent_size=32, ncls=15, **kwargs):
+    return  create_unet_model(latent_size=latent_size, model_channels=64, num_heads=4, channel_mult=[1,2,4], context_dim=128, ncls=ncls)
 
 
-def UNET_S(**kwargs):
-    return  create_unet_model(latent_size=32, model_channels=128, num_heads=4, channel_mult=[1,2,4], context_dim=256)
+def UNET_S(latent_size=32, ncls=15, **kwargs):
+    return  create_unet_model(latent_size=latent_size, model_channels=128, num_heads=4, channel_mult=[1,2,4], context_dim=256, ncls=ncls)
 
 
-def UNET_M(**kwargs):
-    return  create_unet_model(latent_size=32, model_channels=192, num_heads=6, channel_mult=[1,2,4], context_dim=384)
+def UNET_M(latent_size=32, ncls=15, **kwargs):
+    return  create_unet_model(latent_size=latent_size, model_channels=192, num_heads=6, channel_mult=[1,2,4], context_dim=384, ncls=ncls)
 
 
-def UNET_L(**kwargs):
-    return  create_unet_model(latent_size=32, model_channels=256, num_heads=8, channel_mult=[1,2,4], context_dim=512)
+def UNET_L(latent_size=32, ncls=15, **kwargs):
+    return  create_unet_model(latent_size=latent_size, model_channels=256, num_heads=8, channel_mult=[1,2,4], context_dim=512, ncls=ncls)
 
 
-def UNET_XL(**kwargs):
-    return  create_unet_model(latent_size=32, model_channels=320, num_heads=12, channel_mult=[1,2,4], context_dim=640)
+def UNET_XL(latent_size=32, ncls=15, **kwargs):
+    return  create_unet_model(latent_size=latent_size, model_channels=320, num_heads=12, channel_mult=[1,2,4], context_dim=640, ncls=ncls)
 
 
 

@@ -122,13 +122,11 @@ Below are some sample outputs showcasing the performance of DeCo-Diff on real da
 If you find DeCo-Diff useful in your research, please cite our work:
 
 ```bibtex
-@article{beizaee2025correcting,
-  title={Correcting Deviations from Normality: A Reformulated Diffusion Model for Multi-Class Unsupervised Anomaly Detection},
+@inproceedings{beizaee2025correcting,
+  title={Correcting deviations from normality: A reformulated diffusion model for multi-class unsupervised anomaly detection},
   author={Beizaee, Farzad and Lodygensky, Gregory A and Desrosiers, Christian and Dolz, Jose},
-  journal={arXiv preprint arXiv:2503.19357},
+  booktitle={Proceedings of the Computer Vision and Pattern Recognition Conference},
+  pages={19088--19097},
   year={2025}
 }
 ```
-
-
-

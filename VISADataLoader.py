@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 class VISADataset(Dataset):
     """ABIDE dataset."""
 
-    def __init__(self, mode, object_class, root_dir='/home/farzadbz/VisA/split_csv', transform=None,  normal=True, image_size=256,  center_size=224, augment=False, center_crop=False, anomaly_class='all'):
+    def __init__(self, mode, object_class, rootdir='/home/farzadbz/VisA/split_csv', transform=None,  normal=True, image_size=256,  center_size=224, augment=False, center_crop=False, anomaly_class='all'):
         """
         Args:
             mode: 'train','val','test'
@@ -51,7 +51,7 @@ class VISADataset(Dataset):
 
         if self.object_class == 'all':
             if mode=='train':
-                df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="{mode}"').reset_index(drop=True)
+                df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="train"').reset_index(drop=True)
             else:
                 if normal:
                     df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="test"').query('label=="normal"').reset_index(drop=True)
@@ -59,7 +59,7 @@ class VISADataset(Dataset):
                     df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="test"').reset_index(drop=True)
         else:
             if mode=='train':
-                df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="{mode}"').query(f'object=="{self.object_class}"').reset_index(drop=True)
+                df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="train"').query(f'object=="{self.object_class}"').reset_index(drop=True)
             else:
                 if normal:
                     df = pd.read_csv(os.path.join('.', 'splits', 'visa-split.csv')).query(f'split=="test"').query('label=="normal"').query(f'object=="{self.object_class}"').reset_index(drop=True)
@@ -69,19 +69,16 @@ class VISADataset(Dataset):
         self.segs = []
         self.object_classes = []
         for i,row in df.iterrows():
-            data_path = os.path.join('/home/farzadbz/VisA', row['image'])
-            img = np.array(Image.open(data_path).convert('RGB').resize((image_size, image_size))).astype(np.float32)
+            data_path = os.path.join(rootdir, row['image'])
+            img = np.array(Image.open(data_path).convert('RGB').resize((self.image_size, self.image_size))).astype(np.float32)
             self.images.append(img)
             # object_class = data_path.split('/')[9]
             
             self.object_classes.append(object_cls_dict[row['object']])
             if row['label']!='normal':
-                seg_path = os.path.join('/home/farzadbz/VisA', row['mask'])
-                seg = np.array(Image.open(seg_path).convert('RGB').resize((image_size, image_size))).astype(np.float32)
-                if len(seg.shape) == 2:
-                    seg = (seg>0).astype(np.int32)
-                else:
-                    seg = (seg.sum(axis=2)>0).astype(np.int32)
+                seg_path = os.path.join(rootdir, row['mask'])
+                    
+                seg = (np.array(Image.open(seg_path).convert('L').resize((self.image_size, self.image_size)))>0).astype(np.uint8)
                 self.segs.append(seg)
             else:
                 self.segs.append(np.zeros((image_size,image_size)).astype(np.int32))
@@ -126,4 +123,4 @@ class VISADataset(Dataset):
         else:
             img = self.transform_volume(img)
             img = (img-0.5)/0.5
-        return img, seg.astype(np.float32), int(y)
+        return img, seg, int(y)
