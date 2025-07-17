@@ -87,11 +87,7 @@ class MVTECDataset(Dataset):
                 self.segs.append(np.zeros((self.image_size, self.image_size)))
         if self.augment:
            self.aug = A.Compose([
-                A.Affine (translate_px=int(self.image_size/8 - self.center_size/8), p=0.8),
-                A.RandomBrightnessContrast(
-                brightness_limit=0.05,
-                contrast_limit=0.05,
-                p=0.5),
+                A.Affine (translate_px=int(self.image_size/8 - self.center_size/8), p=0.5),
                 A.CenterCrop(p=1, height=self.center_size, width=self.center_size)])
         else:
             self.aug = A.CenterCrop(p=1, height=self.center_size, width=self.center_size)

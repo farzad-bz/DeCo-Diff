@@ -28,15 +28,6 @@ from transformers import get_cosine_schedule_with_warmup
 
 
 import torch.nn as nn
-class ClassEmbedder(nn.Module):
-    def __init__(self, embed_dim, n_classes=15):
-        super().__init__()
-        self.embedding = nn.Embedding(n_classes, embed_dim)
-
-    def forward(self, c):
-        c = self.embedding(c)
-        return c
-
 
 def smooth_mask(mask, sigma=1.0):
     smoothed_mask = gaussian_filter(mask, sigma=sigma)
@@ -45,17 +36,6 @@ def smooth_mask(mask, sigma=1.0):
 #################################################################################
 #                             Training Helper Functions                         #
 #################################################################################
-
-# @torch.no_grad()
-# def update_ema(ema_model, model, decay=0.9999):
-#     """
-#     Step the EMA model towards the current model.
-#     """
-#     ema_params = OrderedDict(ema_model.named_parameters())
-#     model_params = OrderedDict(model.named_parameters())
-
-#     for name, param in model_params.items():
-#         ema_params[name].mul_(decay).add_(param.data, alpha=1 - decay)
 
 
 def requires_grad(model, flag=True):
@@ -178,13 +158,35 @@ def main(args):
     # Create model:
     assert args.center_size % 8 == 0, "Image size must be divisible by 8 (for the VAE encoder)."
     latent_size = args.actual_image_size // 8
-    model = UNET_models[args.model_size](latent_size=latent_size)
+    model = UNET_models[args.model_size](latent_size=latent_size, ncls=args.num_classes)
         
 
-    ema = deepcopy(model).to(device)  # Create an EMA of the model for use after training
-    requires_grad(ema, False)
+    if not args.from_scratch:
+        dictss = {}
+        try:
+            state_dict = torch.load(args.pretrained)['state_dict']
+            for key in state_dict.keys():
+                if key.startswith('model.diffusion_model'):
+
+                    dictss[key.replace('model.diffusion_model.', '')] = state_dict[key] 
+
+            dictss['cond_stage_model.embedding.weight'] = state_dict['cond_stage_model.embedding.weight'][:args.num_classes,:] 
+
+            logger.info(model.load_state_dict(dictss))
+            
+            logger.info('Stable diiffusion weights loaded!')
+        except:
+            try:
+                state_dict = torch.load(args.pretrained)['model']
+                model.load_state_dict(state_dict)
+                logger.info('pretrained weights loaded!')
+            except:
+                logger.info('provided pretrained model could not be loaded! Training from scratch')
+                
+        
+
     model = DDP(model.to(device), device_ids=[rank])
-    diffusion = create_diffusion(timestep_respacing="ddim10", predict_deviation=True, predict_xstart=False, sigma_small=False)  # default: 1000 steps, linear noise schedule
+    diffusion = create_diffusion(timestep_respacing="ddim10", predict_deviation=True, predict_xstart=False, sigma_small=False, diffusion_steps=10)
     vae = AutoencoderKL.from_pretrained(f"stabilityai/sd-vae-ft-{args.vae_type}").to(device)
     vae.eval()
     logger.info(f"Number of Parameters: {sum(p.numel() for p in model.parameters()):}")
@@ -204,12 +206,11 @@ def main(args):
        
     batch_size = args.global_batch_size // dist.get_world_size()
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=False)
-    accumulation_steps = 1
+    accumulation_steps = args.accumulation_steps
 
         
     logger.info(f"Dataset contains {len(dataset):,} training images")
 
-    adjusted_epochs = args.epochs
 
     # Setup optimizer (we used default Adam betas=(0.9, 0.999) and a constant learning rate of 1e-4 in our paper):
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -218,18 +219,8 @@ def main(args):
         num_warmup_steps=args.warmup_epochs,
         num_training_steps=args.epochs*1.5,
     )
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=adjusted_epochs, eta_min=args.lr/100)
-    # Setup data:
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], inplace=True)
-    ])
-        
-    # Prepare models for training:
-    # update_ema(ema, model.module, decay=0)  # Ensure EMA is initialized with synced weights
 
     model.train()  # important! This enables embedding dropout for classifier-free guidance
-    # ema.eval()  # EMA model should always be in eval mode
 
     # Variables for monitoring/logging purposes:
     train_steps = 0
@@ -238,9 +229,9 @@ def main(args):
     running_mse = 0
     start_time = time()
 
-    logger.info(f"Training for {adjusted_epochs} epochs...")
+    logger.info(f"Training for {args.epochs} epochs...")
     
-    for epoch in range(adjusted_epochs):
+    for epoch in range(1, args.epochs+1):
         logger.info(f"Beginning epoch {epoch}...")
         for ii, (x, _, y) in enumerate(loader):
             x = x.to(device)
@@ -250,19 +241,19 @@ def main(args):
             t = torch.randint(0, diffusion.num_timesteps, (x.shape[0],), device=device)
  
             if args.actual_image_size == 224:
-                mask_patch_size = np.random.choice([1,2,4,7], 1, p=[0.4, 0.3, 0.2, 0.1]).item()
-            if args.actual_image_size == 256:
-                mask_patch_size = np.random.choice([1,2,4,8], 1, p=[0.4, 0.3, 0.2, 0.1]).item()
-            if args.actual_image_size == 320:
-                mask_patch_size = np.random.choice([1,2,4,8], 1, p=[0.4, 0.3, 0.2, 0.1]).item()
-            if args.actual_image_size == 384:
-                mask_patch_size = np.random.choice([1,2,4,8,12], 1, p=[0.3, 0.25, 0.20, 0.15, 0.1]).item()
-            if args.actual_image_size == 448:
                 mask_patch_size = np.random.choice([1,2,4,8,14], 1, p=[0.3, 0.25, 0.20, 0.15, 0.1]).item()
+            elif args.actual_image_size == 256:
+                mask_patch_size = np.random.choice([1,2,4,8,16], 1, p=[0.3, 0.25, 0.20, 0.15, 0.1]).item()
+            elif args.actual_image_size == 320:
+                mask_patch_size = np.random.choice([1,2,4,8,16], 1, p=[0.3, 0.25, 0.20, 0.15, 0.1]).item()
+            elif args.actual_image_size == 384:
+                mask_patch_size = np.random.choice([1,2,4,8,16,24], 1, p=[0.25, 0.2, 0.20, 0.15, 0.1, 0.1]).item()
+            elif args.actual_image_size == 448:
+                mask_patch_size = np.random.choice([1,2,4,8,16,28], 1, p=[0.25, 0.2, 0.20, 0.15, 0.1, 0.1]).item()
             elif args.actual_image_size == 512:
-                mask_patch_size = np.random.choice([1,2,4,8,16], 1, p=[0.3, 0.25, 0.20, 0.15, 0.1]).item()   
+                mask_patch_size = np.random.choice([1,2,4,8,16,32], 1, p=[0.25, 0.2, 0.20, 0.15, 0.1, 0.1]).item()   
             if args.mask_random_ratio:
-                mask_ratios = np.random.uniform(low=0.0, high=0.7, size = x.shape[0])
+                mask_ratios = np.random.uniform(low=0.0, high=args.mask_ratio, size = x.shape[0])
             else:
                 mask_ratio = args.mask_ratio
                 mask_ratios = [mask_ratio]*x.shape[0],
@@ -278,14 +269,13 @@ def main(args):
             noise = noise_mask * torch.randn_like(x, device=device) + (1-noise_mask) *  shuffle_patches(x, mask_patch_size)
             
             loss_dict = diffusion.training_losses(model, x, t, model_kwargs, noise = noise)
-            loss = loss_dict["loss"].mean()
+            loss = loss_dict["loss"].mean() / accumulation_steps
             loss.backward()
             
             if (ii + 1) % accumulation_steps == 0:
                 opt.step()
                 opt.zero_grad() 
                 
-            # update_ema(ema, model.module)
 
             # Log loss values:
             running_loss += loss.item()
@@ -320,13 +310,14 @@ def main(args):
                 # Save checkpoint:
                 checkpoint = {
                     "model": model.module.state_dict(),
-                    # "ema": ema.state_dict(),
                     # "opt": opt.state_dict(),
                     "args": args
                 }
-                checkpoint_path = f"{checkpoint_dir}/last.pt"
+                checkpoint_path = f"{checkpoint_dir}/epoch-{epoch}.pt"
                 torch.save(checkpoint, checkpoint_path)
-                logger.info(f"Saved checkpoint to {checkpoint_path}")
+                last_checkpoint_path = f"{checkpoint_dir}/last.pt"
+                torch.save(checkpoint, last_checkpoint_path)
+                logger.info(f"Saved checkpoint to {checkpoint_dir}")
 
             dist.barrier()
             
@@ -339,14 +330,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, choices=['mvtec','visa'], default="mvtec")
     parser.add_argument("--data-dir", type=str, default='./mvtec-dataset/')
-    parser.add_argument("--model-size", type=str, choices=['UNet_XS','UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default='UNet_XS')
-    parser.add_argument("--image-size", type=int, default= 288 )
+    parser.add_argument("--model-size", type=str, choices=['UNet_XS','UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default='UNet_L')
+    parser.add_argument("--image-size", type=int, default= 288)
     parser.add_argument("--center-size", type=int, default=256)
     parser.add_argument("--center-crop", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False, default=True)
     parser.add_argument("--epochs", type=int, default=800)
     parser.add_argument("--warmup-epochs", type=int, default=10)
     parser.add_argument("--global-batch-size", type=int, default=128)
-    parser.add_argument("--global-seed", type=int, default=10)
+    parser.add_argument("--global-seed", type=int, default=1000)
     parser.add_argument("--vae-type", type=str, choices=["ema", "mse"], default="ema")  # Choice doesn't affect training
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--log-every", type=int, default=20)
@@ -359,7 +350,8 @@ if __name__ == "__main__":
     parser.add_argument("--mask-random-ratio", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False, default=True)
     parser.add_argument("--from-scratch", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False, default=True)
     parser.add_argument("--augmentation", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False, default=True)
-    
+    parser.add_argument("--accumulation-steps", type=int, default=2)
+    parser.add_argument("--pretrained", type=str, default='.')
     
     args = parser.parse_args()
     if args.dataset == 'mvtec':

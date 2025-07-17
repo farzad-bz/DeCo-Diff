@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 class VISADataset(Dataset):
     """ABIDE dataset."""
 
-    def __init__(self, mode, object_class, rootdir='/home/farzadbz/VisA/split_csv', transform=None,  normal=True, image_size=256,  center_size=224, augment=False, center_crop=False, anomaly_class='all'):
+    def __init__(self, mode, object_class, rootdir='./VisA/', transform=None,  normal=True, image_size=256,  center_size=224, augment=False, center_crop=False, anomaly_class='all'):
         """
         Args:
             mode: 'train','val','test'
@@ -84,12 +84,7 @@ class VISADataset(Dataset):
                 self.segs.append(np.zeros((image_size,image_size)).astype(np.int32))
 
         if self.augment:
-           self.aug = A.Compose([A.Affine (rotate=3, p=0.3),
-                A.Affine (translate_px=int(self.image_size/8 - self.center_size/8), p=0.8),
-                A.RandomBrightnessContrast(
-                brightness_limit=0.05,
-                contrast_limit=0.05,
-                p=0.3),
+           self.aug = A.Compose([A.Affine (translate_px=int(self.image_size/8 - self.center_size/8), p=0.5),
                 A.CenterCrop(p=1, height=self.center_size, width=self.center_size)])
         else:
             self.aug = A.CenterCrop(p=1, height=self.center_size, width=self.center_size)

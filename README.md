@@ -31,21 +31,6 @@ Download the datasets below and organize them as shown:
 - [MVTec-AD](https://www.mvtec.com/company/research/datasets/mvtec-ad)
 - [VisA](https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar)
 
-The expected file structure (default for MVTec-AD) is as follows:
-```
-├── class1
-│   ├── ground_truth
-│   │   ├── defect1
-│   │   └── defect2
-│   ├── test
-│   │   ├── defect1
-│   │   ├── defect2
-│   │   └── good
-│   └── train
-│       └── good
-├── class2
-...
-```
 
 ---
 
@@ -55,14 +40,13 @@ Train our model using the following command. This command sets up the RLR traini
 
 ```bash
 torchrun train_DeCo_Diff.py \
-            --dataset mvtec \
-            --data-dir ./mvtec-dataset/ \
+            --dataset mvtec \ #mvtec or visa
+            --data-dir /path/to/dataset \
             --model-size UNet_L \
             --object-category all  \
             --image-size 288 \
             --center-size 256 \
-            --center-crop True \
-            --augmentation True 
+            --center-crop True
 ```
 
 ---
@@ -73,15 +57,15 @@ Once the model is trained, test its performance using the command below:
 
 ```bash
 python evaluation_DeCo_Diff.py \
-            --dataset mvtec \
-            --data-dir ./mvtec-dataset/ \
-            --model-size UNet_L \
+            --dataset mvtec \ #mvtec or visa
+            --data-dir /path/to/dataset \
+            --model-size UNet_L \ #trained model size
             --object-category all  \
             --anomaly-class all  \
             --image-size 288 \
             --center-size 256 \
             --center-crop True \
-            --pretrained /path/to/pretrained_weights.pt
+            --model-path /path/to/pretrained_weights.pt
 ```
 ---
 
@@ -90,22 +74,26 @@ python evaluation_DeCo_Diff.py \
 For convenience, we provide pretrained weights for DeCo-Diff (UNet_L). These weights can be used for rapid inference and further experimentation:
 
 - **MVTec-AD Pretrained Weights:**  
-  Download from [Google Drive](https://drive.google.com/file/d/1M-BQeZxyrXRR911O5Np5pLmd7Ev23EXy/view?usp=share_link) 
+  Download from [Google Drive](https://drive.google.com/file/d/1ZuPD9x_HYyylY2DlCtl0PRi5UZyn0XAL/view?usp=share_link) 
   
 - **VisA Pretrained Weights:**  
-  Download from [Google Drive](https://drive.google.com/file/d/1uNE-Vtb7TPeuMkyepTbKFsxUy8472enx/view?usp=share_link) 
+  Download from [Google Drive](https://drive.google.com/file/d/1bZvzIyuEMWxIo8ZByP9us--OhTTPXYiA/view?usp=sharing) 
+
+
+Also, using pretrained model with imagenet could slightly boost the performance and ribustness. You could download provided pretrained model provided by [LDM repository](https://github.com/CompVis/latent-diffusion?tab=readme-ov-file) from [here!](https://ommer-lab.com/files/latent-diffusion/cin.zip). 
+To use the pretrained model, set `--from-scratch` to `False` and specify the path to the downloaded checkpoint using `--pretrained`.
 
 ---
 
 ## 📊 Results
 
-Below are the performances of DeCo-Diff on the MVTec-AD and VisA datasets. These results illustrate the high efficacy of DeCo-Diff in detecting anomalies in multi-class UAD setting.
+Below are the performances of DeCo-Diff on the MVTec-AD and VisA datasets using the best trained models (provided weights). These results illustrate the high efficacy of DeCo-Diff in detecting anomalies in a multi-class UAD setting. Please note that these results differ slightly from those reported in the paper and are slightly better, as they were obtained using an optimized set of training parameters.
 
 
 |**Dataset**  |I-**AUROC**| I-**AP** |I-**f1max**|P-**AUROC**| P-**AP** |P-**f1max**|P-**AUPRO**|
 |-------------|-----------|----------|-----------|-----------|--------|-----------|-----------|
-| MVTec-AD   |    99.3    |   99.8   |   98.5    |   98.4    |  74.9  |   69.7    |   94.9    |
-| VisA       |    96.4    |   96.8   |   92.2    |   98.5    |  51.3  |   51.2    |   92.1    |
+| MVTec-AD   |    99.2    |   99.7   |   98.7    |   98.8    |  76.8  |   71.1    |   95.1    |
+| VisA       |    96.2    |   97.0   |   92.6    |   98.3    |  57.5  |   56.4    |   91.5    |
 
 ---
 

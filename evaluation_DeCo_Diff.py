@@ -1,5 +1,3 @@
-
-
 import torch
 from skimage.transform import resize
 from diffusion import create_diffusion
@@ -143,16 +141,14 @@ def calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, 
         image_differences.append(image_difference)
         
         latent_difference = (((((torch.abs(latent_samples-encoded))).to(torch.float32)).mean(axis=0)).detach().cpu().numpy().transpose(1,2,0).mean(axis=2))
-        latent_difference = (np.clip(latent_difference, 0.0 , 0.4)) * 2.5
+        latent_difference = (np.clip(latent_difference, 0.0 , 0.2)) * 5
         latent_difference = smooth_mask(latent_difference, sigma=1)
         latent_difference = resize(latent_difference, (center_size, center_size))
         latent_differences.append(latent_difference)
         
         final_anomaly = image_difference * latent_difference
         final_anomaly = np.sqrt(final_anomaly)
-        final_anomaly = smooth_mask(final_anomaly, sigma=1)
         final_anomaly2 = 1/2*image_difference + 1/2*latent_difference
-        final_anomaly2 = smooth_mask(final_anomaly2, sigma=1)
         pred_geometric.append(final_anomaly)
         pred_aritmetic.append(final_anomaly2)
             
@@ -177,8 +173,8 @@ def evaluation(args):
     vae = AutoencoderKL.from_pretrained(vae_model).to(device)
     vae.eval()
     try:
-        if args.pretrained != '':
-            ckpt = args.pretrained
+        if args.model_path != '':
+            ckpt = args.model_path
         else:
             path = f"./DeCo-Diff_{args.dataset}_{args.object_category}_{args.model_size}_{args.center_size}"
             try:
@@ -186,7 +182,7 @@ def evaluation(args):
             except:
                 ckpt = sorted(glob(f'{path}/*/last.pt'))[-1]
     except:
-        raise Exception("Please provide the model's pretrained path using --pretrained")
+        raise Exception("Please provide the trained model's path using --model_path")
     
 
     latent_size = int(args.center_size) // 8
@@ -195,7 +191,7 @@ def evaluation(args):
     state_dict = torch.load(ckpt)['model']
     print(model.load_state_dict(state_dict))
     model.eval() # important!
-    model.cuda()
+    model.to(device)
     print('model loaded')
 
 
@@ -267,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument("--vae-type", type=str, choices=["ema", "mse"], default="ema")  # Choice doesn't affect training
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--object-category", type=str, default='all')
-    parser.add_argument("--pretrained", type=str, default='.')
+    parser.add_argument("--model-path", type=str, default='.')
     parser.add_argument("--anomaly-class", type=str, default='all')
     parser.add_argument("--reverse-steps", type=int, default=5)
     
