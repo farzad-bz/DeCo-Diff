@@ -27,7 +27,7 @@ pip3 install -r requirements.txt
 
 ### 📁 Datasets
 
-Download the datasets below and organize them as shown:
+You can download the datasets from the links below:
 - [MVTec-AD](https://www.mvtec.com/company/research/datasets/mvtec-ad)
 - [VisA](https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar)
 
