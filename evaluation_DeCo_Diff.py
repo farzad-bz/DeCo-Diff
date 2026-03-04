@@ -254,7 +254,8 @@ def evaluation(args):
         print(category)        
         anomaly_maps = calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=args.center_size)
         evaluate_anomaly_maps(anomaly_maps, np.stack(segmentation_s, axis=0))
-        visualize(anomaly_maps, x0_s, image_samples_s, segmentation_s, category)
+        if args.visualize:
+            visualize(anomaly_maps, x0_s, image_samples_s, segmentation_s, category)
         print('=='*30)  
         
         
@@ -293,6 +294,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--object-category", type=str, default='all')
     parser.add_argument("--model-path", type=str, default='.')
+    parser.add_argument("--visualize", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False, default=True)
     parser.add_argument("--anomaly-class", type=str, default='all')
     parser.add_argument("--reverse-steps", type=int, default=5)
     
