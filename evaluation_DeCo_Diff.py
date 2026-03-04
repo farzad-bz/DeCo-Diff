@@ -25,6 +25,10 @@ import pandas as pd
 from skimage import measure
 from sklearn.metrics import auc
 
+import os
+import cv2
+from PIL import Image
+
 def compute_pro(masks: ndarray, amaps: ndarray, num_th: int = 200) -> None:
     """Compute the area under the curve of per-region overlaping (PRO) and 0 to 0.3 FPR
     Args:
@@ -250,7 +254,32 @@ def evaluation(args):
         print(category)        
         anomaly_maps = calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=args.center_size)
         evaluate_anomaly_maps(anomaly_maps, np.stack(segmentation_s, axis=0))
+        visualize(anomaly_maps, x0_s, image_samples_s, segmentation_s, category)
         print('=='*30)  
+        
+        
+def visualize(anomaly_maps, x0_s, image_samples_s, segmentation_s, category):
+    input_images = []
+    output_images = []
+    counter = -1
+    os.makedirs(f'./visualizations/{category}/', exist_ok=True)
+    for anomaly_map, x, image_samples, segmentation in zip(anomaly_maps['anomaly_geometric'], x0_s, image_samples_s, segmentation_s):
+        counter+=1
+        visualization_image = np.zeros((1024, 256, 3)).astype(np.uint8)
+        input_image = ((np.clip(x[0].detach().cpu().numpy(), -1, 1).transpose(1,2,0))*127.5+127.5).astype(np.uint8)
+        output_image = ((np.clip(image_samples[0].detach().cpu().numpy(), -1, 1).transpose(1,2,0))*127.5+127.5).astype(np.uint8)
+        input_images.append(input_image)
+        output_images.append(output_image)
+        
+        scoremap = cv2.applyColorMap((anomaly_map*255).astype(np.uint8), cv2.COLORMAP_JET)[:,:,::-1]
+        anomal_map_img = (0.5 * input_image + (1 - 0.5) * scoremap).astype(np.uint8)
+        
+        visualization_image[:256, :, :] = input_image
+        visualization_image[256:512, :, :] = output_image
+        visualization_image[512:768, :, :] = np.repeat((segmentation*255).unsqueeze(0).cpu().numpy(), 3, axis=0).transpose([1,2,0])
+        visualization_image[768:, :, :] = anomal_map_img
+        Image.fromarray(visualization_image).save(f'./visualizations/{category}/{counter}.png')
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
